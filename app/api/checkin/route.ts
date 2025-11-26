@@ -3,7 +3,7 @@ import { supabase } from '@/app/lib/supabaseClient';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 
-// Inisialisasi Client Blockchain (Base) untuk verifikasi tanda tangan
+// Inisialisasi Client Blockchain (Base)
 const publicClient = createPublicClient({
   chain: base,
   transport: http(),
@@ -11,13 +11,11 @@ const publicClient = createPublicClient({
 
 export async function POST(request: Request) {
   try {
-    // Ambil data dari body request frontend
     const { address, signature, message, referrer } = await request.json();
 
     // -------------------------------------------------------------------------
-    // 1. VERIFIKASI TANDA TANGAN (WAJIB UNTUK KEAMANAN)
+    // 1. VERIFIKASI TANDA TANGAN (KEAMANAN)
     // -------------------------------------------------------------------------
-    // Kita pastikan request ini benar-benar dari pemilik wallet, bukan bot/hacker.
     const valid = await publicClient.verifyMessage({
       address,
       message,
@@ -25,11 +23,11 @@ export async function POST(request: Request) {
     });
 
     if (!valid) {
-      return NextResponse.json({ error: 'Signature invalid! Verification failed.' }, { status: 401 });
+      return NextResponse.json({ error: 'Signature invalid!' }, { status: 401 });
     }
 
     // -------------------------------------------------------------------------
-    // 2. CEK APAKAH USER SUDAH ADA DI DATABASE?
+    // 2. CEK USER DI DATABASE
     // -------------------------------------------------------------------------
     let { data: user, error } = await supabase
       .from('users')
@@ -38,62 +36,63 @@ export async function POST(request: Request) {
       .single();
 
     // -------------------------------------------------------------------------
-    // SKENARIO A: USER BARU (REGISTER PERTAMA KALI)
+    // SKENARIO A: USER BARU (REGISTER)
     // -------------------------------------------------------------------------
     if (!user) {
       console.log("New User Detected! Referrer:", referrer);
       
       let finalReferrer = null;
 
-      // Logika Referral: Jika ada referrer & bukan mengundang diri sendiri
+      // Logika Referral: Beri Bonus ke Pengundang
       if (referrer && referrer !== address) {
-        // Cek validitas referrer di database (harus user asli)
         const { data: refUser } = await supabase
           .from('users')
-          .select('wallet_address, xp, referral_count')
+          .select('wallet_address, xp, referral_count, bait')
           .eq('wallet_address', referrer)
           .single();
 
         if (refUser) {
           finalReferrer = referrer;
           
-          // BONUS XP KE PENGUNDANG (+50 XP)
-          // Kita juga update counter referral mereka
+          // BONUS KE PENGUNDANG: +50 XP & +2 BAIT
           await supabase.from('users').update({
             xp: (refUser.xp || 0) + 50,
+            bait: (refUser.bait || 0) + 2,
             referral_count: (refUser.referral_count || 0) + 1
           }).eq('wallet_address', referrer);
         }
       }
 
-      // Buat User Baru di Database
+      // Buat User Baru
+      // Modal Awal: 5 Bait (dari default DB) + 3 Bait (Bonus Login Hari Pertama) = 8 Bait
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert([{ 
           wallet_address: address, 
-          xp: 0, 
+          xp: 20,                 // XP Awal
           level: 1, 
-          current_streak: 1,      // Streak awal 1
-          total_login_days: 1,    // Total hari login 1 (Plankton)
+          current_streak: 1, 
+          total_login_days: 1, 
           last_checkin: new Date().toISOString(),
-          referrer_address: finalReferrer
+          referrer_address: finalReferrer,
+          bait: 8                 // Modal Awal + Daily Bonus
         }])
         .select()
         .single();
       
       if (createError) throw createError;
 
-      // JANGAN LUPA: Catat juga ke tabel Log Kalender untuk hari pertama
+      // Catat Log Kalender
       const todayDate = new Date().toISOString().split('T')[0];
       try {
         await supabase.from('checkin_logs').insert([
             { wallet_address: address, checkin_date: todayDate }
         ]);
-      } catch (e) { console.log("Log insert error (minor):", e); }
+      } catch (e) { console.log("Log insert error:", e); }
       
       return NextResponse.json({ 
         success: true, 
-        message: 'Welcome! First Sign-in Success! +20 XP', 
+        message: 'Welcome! +20 XP & +3 Bait', 
         user: newUser 
       });
     }
@@ -102,9 +101,9 @@ export async function POST(request: Request) {
     // SKENARIO B: USER LAMA (DAILY CHECK-IN)
     // -------------------------------------------------------------------------
     
-    // 3. CEK APAKAH SUDAH ABSEN HARI INI? (Anti-Spam)
+    // Cek apakah sudah absen hari ini
     const now = new Date();
-    const todayDate = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const todayDate = now.toISOString().split('T')[0];
     const lastCheckin = user.last_checkin ? new Date(user.last_checkin).toISOString().split('T')[0] : null;
     
     if (lastCheckin === todayDate) {
@@ -115,27 +114,21 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. HITUNG STREAK & TOTAL HARI
+    // Hitung Streak
     const oneDay = 24 * 60 * 60 * 1000;
     const lastDateObj = user.last_checkin ? new Date(user.last_checkin) : new Date(0);
     const diff = now.getTime() - lastDateObj.getTime();
     
-    let newStreak = 1; // Default reset ke 1 kalau putus streak
-    
-    // Jika selisih waktu < 48 jam (artinya login kemarin atau hari ini), streak lanjut
-    // Logic: Jika login kemarin jam 23:00 dan sekarang jam 01:00 besoknya, itu masih dianggap streak lanjut
-    // Kita beri toleransi sedikit di atas 24 jam (misal < 2 hari kalender)
+    let newStreak = 1;
+    // Jika login kemarin atau hari ini (toleransi < 48 jam), streak lanjut
     if (lastCheckin && diff < 2 * oneDay && diff > 0) {
       newStreak = user.current_streak + 1;
     }
 
-    // Tambah Total Hari Login (Akumulasi seumur hidup untuk Badge Ikan)
-    // Ini tidak akan mereset meskipun streak putus
+    // Update Data
     const newTotalDays = (user.total_login_days || 0) + 1;
-
-    // 5. UPDATE DATABASE
-    // Reward Harian: +20 XP
-    const newXP = (user.xp || 0) + 20;
+    const newXP = (user.xp || 0) + 20;      // Reward XP
+    const newBait = (user.bait || 0) + 3;   // Reward Bait (+3 Umpan)
 
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
@@ -143,7 +136,8 @@ export async function POST(request: Request) {
         last_checkin: now.toISOString(),
         current_streak: newStreak,
         total_login_days: newTotalDays,
-        xp: newXP
+        xp: newXP,
+        bait: newBait
       })
       .eq('wallet_address', address)
       .select()
@@ -151,20 +145,18 @@ export async function POST(request: Request) {
 
     if (updateError) throw updateError;
 
-    // 6. CATAT KE LOG KALENDER (PENTING UNTUK FITUR KALENDER)
-    // Kita pakai try-catch silent di sini, kalau duplicate entry (error unik) biarkan saja
+    // Catat Log Kalender
     try {
       await supabase.from('checkin_logs').insert([
         { wallet_address: address, checkin_date: todayDate }
       ]);
     } catch (logError) {
-      // Abaikan error jika log hari ini sudah ada (just in case)
-      console.log("Log calendar duplicate or error", logError);
+      // Abaikan jika duplikat log
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Absen Berhasil! +20 XP', 
+      message: 'Absen Berhasil! +20 XP & +3 Bait', 
       user: updatedUser 
     });
 
