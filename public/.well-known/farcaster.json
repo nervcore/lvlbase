@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjEzODc2LCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4NUNjNzFCNTMzYjI4QzU0ZTYwQzYyQjUyMDVjNjBFMjFhN2E5ZDI5OSJ9",
+    "payload": "eyJkb21haW4iOiJsdmxiYXNlLnZlcmNlbC5hcHAifQ",
+    "signature": "MHgyYj..."
+  },
+  "frame": {
+    "version": "1",
+    "name": "LvLBASE",
+    "iconUrl": "https://scontent-iad4-1.choicecdn.com/-/rs:fill:2000:2000/g:ce/f:webp/aHR0cHM6Ly9zY29udGVudC1pYWQ0LTEuY2hvaWNlY2RuLmNvbS8tL3JzOmZpdDoyNDAwOjI0MDAvZjpiZXN0L2FIUjBjSE02THk5dFlXZHBZeTVrWldObGJuUnlZV3hwZW1Wa0xXTnZiblJsYm5RdVkyOXRMMmx3Wm5NdlltRm1lV0psYVdWa1oyWnZjMkprYjJKdFpta3lhSFZ6ZVdJMmIyZHJkamRvWTNSNGNXWndkelV6YVRKbGMyRmlhbmMwWjJreWRYVndZM0U9",
+    "homeUrl": "https://lvlbase.vercel.app",
+    "imageUrl": "https://scontent-iad4-1.choicecdn.com/-/rs:fill:2000:2000/g:ce/f:webp/aHR0cHM6Ly9zY29udGVudC1pYWQ0LTEuY2hvaWNlY2RuLmNvbS8tL3JzOmZpdDoyNDAwOjI0MDAvZjpiZXN0L2FIUjBjSE02THk5dFlXZHBZeTVrWldObGJuUnlZV3hwZW1Wa0xXTnZiblJsYm5RdVkyOXRMMmx3Wm5NdlltRm1lV0psYVdWa1oyWnZjMkprYjJKdFpta3lhSFZ6ZVdJMmIyZHJkamRvWTNSNGNXWndkelV6YVRKbGMyRmlhbmMwWjJreWRYVndZM0U9",
+    "buttonTitle": "Start Fishing 🎣",
+    "splashImageUrl": "https://scontent-iad4-1.choicecdn.com/-/rs:fill:2000:2000/g:ce/f:webp/aHR0cHM6Ly9zY29udGVudC1pYWQ0LTEuY2hvaWNlY2RuLmNvbS8tL3JzOmZpdDoyNDAwOjI0MDAvZjpiZXN0L2FIUjBjSE02THk5dFlXZHBZeTVrWldObGJuUnlZV3hwZW1Wa0xXTnZiblJsYm5RdVkyOXRMMmx3Wm5NdlltRm1lV0psYVdWa1oyWnZjMkprYjJKdFpta3lhSFZ6ZVdJMmIyZHJkamRvWTNSNGNXWndkelV6YVRKbGMyRmlhbmMwWjJreWRYVndZM0U9",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://lvlbase.vercel.app/api/webhook"
+  }
+}

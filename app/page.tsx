@@ -8,7 +8,7 @@ import { supabase } from './lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 
 // CONFIG
-const NFT_CONTRACT_ADDRESS = "0x1b55a04b503ee09af6d953a0242f69b1e6cd6f97";
+const NFT_CONTRACT_ADDRESS = "0x1855a84b583ee09af6d953a8242f69b1e6cd6f97";
 const ZORA_FEE = BigInt("777000000000000"); 
 const DEV_WALLET = "0x09fa94d76E8d974cdd2B12ba1E3959CFd5447EfA"; 
 const NFT_IMAGE_URL = "https://scontent-iad4-1.choicecdn.com/-/rs:fill:2000:2000/g:ce/f:webp/aHR0cHM6Ly9zY29udGVudC1pYWQ0LTEuY2hvaWNlY2RuLmNvbS8tL3JzOmZpdDoyNDAwOjI0MDAvZjpiZXN0L2FIUjBjSE02THk5dFlXZHBZeTVrWldObGJuUnlZV3hwZW1Wa0xXTnZiblJsYm5RdVkyOXRMMmx3Wm5NdlltRm1lV0psYVdWa1oyWnZjMkprYjJKdFpta3lhSFZ6ZVdJMmIyZHJkamRvWTNSNGNXWndkelV6YVRKbGMyRmlhbmMwWjJreWRYVndZM0U9";
