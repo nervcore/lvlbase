@@ -6,6 +6,8 @@ import { parseEther } from 'viem';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
+// IMPORT SDK FARCASTER (PENTING UNTUK SPLASH SCREEN)
+import sdk from '@farcaster/frame-sdk';
 
 // CONFIG
 const NFT_CONTRACT_ADDRESS = "0x1855a84b583ee09af6d953a8242f69b1e6cd6f97";
@@ -104,6 +106,19 @@ function MainAppContent() {
   const [showRankModal, setShowRankModal] = useState(false);
   const [canClaimSupply, setCanClaimSupply] = useState(false);
 
+  // --- FIX FARCASTER STUCK: PANGGIL READY() ---
+  useEffect(() => {
+    const init = async () => {
+        try {
+            // Memberitahu Farcaster bahwa app sudah siap (Hilangkan Splash Screen)
+            await sdk.actions.ready();
+        } catch (err) {
+            console.log("Farcaster SDK not ready (Running in browser?)");
+        }
+    };
+    init();
+  }, []);
+
   useEffect(() => {
     const ref = searchParams.get('ref');
     if (ref) localStorage.setItem('referrer', ref);
@@ -192,7 +207,13 @@ function MainAppContent() {
     setGameState('CASTING');
     setIsFishing(true);
     setStatusMsg("🎣 Casting line...");
-    setPlayerData((prev: any) => ({ ...prev, bait: Math.max(0, (prev.bait || 0) - 1) }));
+    
+    // Fix: Gunakan Callback agar aman dari nilai null
+    setPlayerData((prev: any) => {
+        if (!prev) return null; 
+        return { ...prev, bait: Math.max(0, (prev.bait || 0) - 1) };
+    });
+    
     setTimeout(() => { setGameState('FIGHTING'); setStatusMsg("⚠️ TAP WHEN GREEN!"); }, 2000);
   };
 
@@ -204,7 +225,11 @@ function MainAppContent() {
         const json = await res.json();
         if (json.success) {
             setCaughtFish(json.fish);
-            setPlayerData((prev: any) => ({ ...prev, xp: json.new_xp, bait: json.new_bait }));
+            // Fix: Aman dari crash
+            setPlayerData((prev: any) => {
+                if (!prev) return null;
+                return { ...prev, xp: json.new_xp, bait: json.new_bait };
+            });
             fetchInventory();
             triggerToast(`🐟 You caught a ${json.fish.name}!`); 
         } else {
@@ -222,7 +247,7 @@ function MainAppContent() {
   const resetGame = () => { setGameState('IDLE'); setIsFishing(false); setCaughtFish(null); setStatusMsg(""); };
 
   const handleExchangeFish = async (fish: any) => {
-    // (Fitur Exchange dimatikan sementara sesuai request)
+    // Fitur dimatikan sementara
   };
 
   const isCastDisabled = isFishing || (playerData?.bait || 0) < 1 || gameState === 'CAUGHT';
@@ -245,7 +270,16 @@ function MainAppContent() {
       const data = await response.json();
       if (data.success) { 
         triggerToast("✅ Success! +20 XP & +3 Bait"); 
-        setPlayerData((prev:any) => ({...prev, xp: (prev.xp||0)+20, bait: (prev.bait||0)+3, current_streak: (prev.current_streak||0)+1}));
+        // Fix: Aman dari crash update
+        setPlayerData((prev:any) => {
+            if (!prev) return null;
+            return {
+                ...prev, 
+                xp: (prev.xp||0)+20, 
+                bait: (prev.bait||0)+3, 
+                current_streak: (prev.current_streak||0)+1
+            };
+        });
         setHasCheckedIn(true); localStorage.removeItem('referrer'); 
       } 
       else { triggerToast(`⚠️ ${data.message}`); if(data.success===false) setHasCheckedIn(true); }
@@ -259,31 +293,24 @@ function MainAppContent() {
       const data = await res.json(); 
       if (data.success) { 
         triggerToast("🎁 Reward Claimed! +100 XP +10 Bait"); 
-        setPlayerData((prev:any) => ({...prev, xp: (prev.xp||0)+100, bait: (prev.bait||0)+10})); 
+        setPlayerData((prev:any) => {
+            if(!prev) return null;
+            return {...prev, xp: (prev.xp||0)+100, bait: (prev.bait||0)+10};
+        }); 
         setCanClaimWeekly(false); 
       }
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // --- PERBAIKAN FITUR SHARE ---
   const handleShare = async () => {
     if (hasShared) return;
     if (!isShareLinkOpened) {
-        // LINK UNTUK EMBED (WAJIB URL ONLINE/VERCEL, BUKAN LOCALHOST)
-        // Saat di Vercel, window.location.origin akan jadi https://nama-app.vercel.app
-        const appUrl = window.location.origin; 
-        const refLink = `${appUrl}/?ref=${address}`;
-        
-        // Text Postingan Bersih
-        const text = `I'm on a ${playerData?.current_streak || 1}-day streak on LvLBASE! 🚀 Catch fish & earn XP onchain.`;
-        
-        // EMBED LINK (Bukan Text) - Ini yang bikin jadi Card/Tombol di Warpcast
-        const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(refLink)}`;
-        
-        window.open(url, '_blank'); 
-        setIsShareLinkOpened(true); 
-        triggerToast("👀 Post it, then click VERIFY!"); 
-        return;
+        const baseUrl = window.location.origin; 
+        const refLink = `${baseUrl}/?ref=${address}`;
+        const imageUrl = `${baseUrl}/api/og?level=${dynamicLevel}&streak=${playerData?.current_streak}&xp=${playerData?.xp}`;
+        const text = `I'm on a ${playerData?.current_streak || 1}-day streak on LvLBASE! 🚀 \n\nJoin my squad: ${refLink}`;
+        const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(imageUrl)}`;
+        window.open(url, '_blank'); setIsShareLinkOpened(true); triggerToast("👀 Post it, then click VERIFY!"); return;
     }
     setStatusMsg("⏳ Checking...");
     setTimeout(async () => {
@@ -306,7 +333,10 @@ function MainAppContent() {
         if (json.success) { 
             setHasLiked(true); setIsLikeLinkOpened(false); 
             triggerToast("✅ Liked! +30 XP & +1 Bait"); 
-            setPlayerData((prev:any) => ({...prev, xp: (prev.xp||0)+30, bait: (prev.bait||0)+1}));
+            setPlayerData((prev:any) => {
+                if(!prev) return null;
+                return {...prev, xp: (prev.xp||0)+30, bait: (prev.bait||0)+1};
+            });
         } else { triggerToast("⚠️ " + json.message); }
     }, 1500);
   };
@@ -320,7 +350,10 @@ function MainAppContent() {
         const json = await res.json(); 
         if (json.success) { 
             triggerToast(`✅ ${quest.title} Done! +5 Bait`); 
-            setPlayerData((prev:any) => ({...prev, bait: (prev.bait||0)+5}));
+            setPlayerData((prev:any) => {
+                if(!prev) return null;
+                return {...prev, bait: (prev.bait||0)+5};
+            });
             fetchQuests(); 
         }
     }, 3000); 
@@ -367,7 +400,10 @@ function MainAppContent() {
         const data = await res.json();
         if (data.success) { 
             triggerToast("✅ +10 Bait Added!"); 
-            setPlayerData((prev:any) => ({...prev, bait: (prev.bait||0)+10}));
+            setPlayerData((prev:any) => {
+                if(!prev) return null;
+                return {...prev, bait: (prev.bait||0)+10};
+            });
             setCanClaimSupply(false); 
             fetchPlayerData();
         } 
