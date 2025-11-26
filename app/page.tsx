@@ -70,7 +70,7 @@ function MainAppContent() {
   const [statusMsg, setStatusMsg] = useState("");
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // FUNGSI HELPER: TOAST OTOMATIS HILANG (3 Detik)
+  // TOAST HELPER
   const triggerToast = (msg: string, duration = 3000) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setStatusMsg(msg);
@@ -222,30 +222,7 @@ function MainAppContent() {
   const resetGame = () => { setGameState('IDLE'); setIsFishing(false); setCaughtFish(null); setStatusMsg(""); };
 
   const handleExchangeFish = async (fish: any) => {
-    let cost = 0;
-    let rewardBait = 0;
-    const rarity = fish.fishes.rarity;
-    const qty = fish.quantity;
-
-    if (rarity === 'common') { if (qty < 5) { triggerToast("⚠️ Need 5 Common fish!"); return; } cost = 5; rewardBait = 1; } 
-    else if (rarity === 'uncommon') { if (qty < 2) { triggerToast("⚠️ Need 2 Uncommon fish!"); return; } cost = 2; rewardBait = 1; } 
-    else if (rarity === 'rare') { cost = 1; rewardBait = 2; } 
-    else if (rarity === 'epic') { cost = 1; rewardBait = 10; } 
-    else if (rarity === 'legendary') { cost = 1; rewardBait = 50; }
-
-    if (!confirm(`Trade ${cost} ${fish.fishes.name} for ${rewardBait} Bait?`)) return;
-
-    setStatusMsg("♻️ Exchanging...");
-    // Disini idealnya panggil API backend, tapi untuk MVP kita update client side dulu
-    // (Note: Di production harus ada API /api/game/exchange untuk validasi)
-    setPlayerData((prev: any) => ({ ...prev, bait: (prev.bait || 0) + rewardBait }));
-    
-    setInventory(prev => prev.map(item => {
-        if(item.id === fish.id) return { ...item, quantity: item.quantity - cost };
-        return item;
-    }).filter(item => item.quantity > 0));
-
-    triggerToast(`✅ Traded! +${rewardBait} Bait`);
+    // (Fitur Exchange dimatikan sementara sesuai request)
   };
 
   const isCastDisabled = isFishing || (playerData?.bait || 0) < 1 || gameState === 'CAUGHT';
@@ -288,15 +265,25 @@ function MainAppContent() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
+  // --- PERBAIKAN FITUR SHARE ---
   const handleShare = async () => {
     if (hasShared) return;
     if (!isShareLinkOpened) {
-        const baseUrl = window.location.origin; 
-        const refLink = `${baseUrl}/?ref=${address}`;
-        const imageUrl = `${baseUrl}/api/og?level=${dynamicLevel}&streak=${playerData?.current_streak}&xp=${playerData?.xp}`;
-        const text = `I'm on a ${playerData?.current_streak || 1}-day streak on LvLBASE! 🚀 \n\nJoin my squad: ${refLink}`;
-        const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(imageUrl)}`;
-        window.open(url, '_blank'); setIsShareLinkOpened(true); triggerToast("👀 Post it, then click VERIFY!"); return;
+        // LINK UNTUK EMBED (WAJIB URL ONLINE/VERCEL, BUKAN LOCALHOST)
+        // Saat di Vercel, window.location.origin akan jadi https://nama-app.vercel.app
+        const appUrl = window.location.origin; 
+        const refLink = `${appUrl}/?ref=${address}`;
+        
+        // Text Postingan Bersih
+        const text = `I'm on a ${playerData?.current_streak || 1}-day streak on LvLBASE! 🚀 Catch fish & earn XP onchain.`;
+        
+        // EMBED LINK (Bukan Text) - Ini yang bikin jadi Card/Tombol di Warpcast
+        const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(refLink)}`;
+        
+        window.open(url, '_blank'); 
+        setIsShareLinkOpened(true); 
+        triggerToast("👀 Post it, then click VERIFY!"); 
+        return;
     }
     setStatusMsg("⏳ Checking...");
     setTimeout(async () => {
@@ -433,6 +420,7 @@ function MainAppContent() {
                         </div>
                     ))}
                 </div>
+                <p className="text-center text-[10px] text-gray-500 mt-4 italic">*Multiplier activated via smart contract soon</p>
             </div>
         </div>
       )}
